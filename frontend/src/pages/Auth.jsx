@@ -47,7 +47,7 @@ const AuthPage = () => {
           <div className="relative w-full h-full flex items-center justify-center">
             {/* 3D Illustration Image */}
             <img 
-              src="/Gemini_Generated_Image_vn5p9uvn5p9uvn5p.png" 
+              src="/Gemini_Generated_Image_byvbolbyvbolbyvb.png" 
               alt="People Connecting Illustration" 
               className="w-full h-full object-contain"
               style={{
@@ -65,36 +65,19 @@ const AuthPage = () => {
       </div>
 
       {/* Right Side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 bg-white overflow-y-auto">
         <div className="w-full max-w-md">
-          {/* Logo and Name */}
-          <div className="flex items-center justify-center gap-3 mb-12">
+          {/* Logo */}
+          <div className="flex items-center justify-center mb-4 sm:mb-6">
             <img 
-              src="/logo.avif" 
-              alt="UniConnect" 
-              className="h-12 w-auto object-contain"
+              src="/logo.png" 
+              alt="ConnectUNI" 
+              className="h-24 sm:h-32 md:h-40 w-auto object-contain"
             />
-            <h1 
-              className="cursive-logo"
-              style={{
-                fontFamily: "'Great Vibes', 'Dancing Script', 'Allura', 'Satisfy', 'Playfair Display', 'Cormorant Garamond', cursive",
-                fontWeight: 700,
-                fontStyle: 'italic',
-                letterSpacing: '4px',
-                fontSize: '3.5rem',
-                color: '#262626',
-                textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                lineHeight: '1.2',
-                margin: 0,
-                fontVariant: 'normal'
-              }}
-            >
-              UniConnect
-            </h1>
           </div>
 
           {/* Toggle */}
-          <div className="flex justify-center mb-8 space-x-2">
+          <div className="flex justify-center mb-5 space-x-2">
             <button
               onClick={() => setIsLogin(true)}
               className={`px-8 py-2.5 font-semibold rounded-l-full transition-all duration-300 ${
@@ -120,7 +103,7 @@ const AuthPage = () => {
           {/* Form */}
           <form
             onSubmit={handleSubmit}
-            className="flex flex-col gap-5"
+            className="flex flex-col gap-4"
           >
             {!isLogin && (
               <div className="relative">

@@ -1,7 +1,7 @@
 import axios from 'axios'
 import React, { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FaUserCircle, FaTimes } from 'react-icons/fa'
+import { FaUserCircle, FaTimes, FaTrash } from 'react-icons/fa'
 
 // Function to format numbers (e.g., 2400 -> 2.4K)
 const formatNumber = (num) => {
@@ -24,6 +24,7 @@ const capitalizeName = (name) => {
 const Profile = () => {
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
+  const dpInputRef = useRef(null)
   const [userName, setUserName] = useState("")
   const [userFullName, setUserFullName] = useState("")
   const [dp, setDp] = useState("")
@@ -37,6 +38,9 @@ const Profile = () => {
   const [selectedPostIndex, setSelectedPostIndex] = useState(0)
   const [editName, setEditName] = useState("")
   const [editBio, setEditBio] = useState("")
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+  const [deletingPost, setDeletingPost] = useState(false)
+  const [uploadingDp, setUploadingDp] = useState(false)
 
   // Fetch user profile data and posts
   useEffect(() => {
@@ -130,10 +134,91 @@ const Profile = () => {
         }
       }
     } catch (err) {
-      alert("Upload failed")
+      console.error("Upload failed:", err)
     }
 
     e.target.value = null
+  }
+
+  // Handle dp upload/change
+  const handleDpUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    // Show immediate preview for better UX
+    const previewUrl = URL.createObjectURL(file)
+    setDp(previewUrl)
+    setIsDpModalOpen(false)
+    setUploadingDp(true)
+
+    const formData = new FormData()
+    formData.append("dp", file)
+
+    try {
+      const token = localStorage.getItem("token")
+      const res = await axios.post(
+        "http://localhost:5000/uploadDp",
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      )
+
+      if (res.data.status === 200) {
+        setDp(res.data.url)
+        URL.revokeObjectURL(previewUrl) // Clean up preview URL
+      }
+    } catch (err) {
+      console.error("Error uploading dp:", err)
+    } finally {
+      setUploadingDp(false)
+    }
+
+    e.target.value = null
+  }
+
+  // Handle dp circle click
+  const handleDpClick = () => {
+    if (!dp) {
+      // No dp exists - directly open file picker to set dp
+      dpInputRef.current?.click()
+    } else {
+      // Dp exists - open modal to view (with option to change)
+      setIsDpModalOpen(true)
+    }
+  }
+
+  // Handle delete post
+  const handleDeletePost = async () => {
+    if (!posts[selectedPostIndex]) return
+    
+    setDeletingPost(true)
+    try {
+      const token = localStorage.getItem("token")
+      const postId = posts[selectedPostIndex]._id
+      
+      const res = await axios.delete(
+        `http://localhost:5000/deletePost/${postId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      )
+
+      if (res.data.status === 200) {
+        // Remove the post from local state
+        const updatedPosts = posts.filter((_, index) => index !== selectedPostIndex)
+        setPosts(updatedPosts)
+        setIsDeleteConfirmOpen(false)
+        setIsMediaModalOpen(false)
+        setSelectedPostIndex(0)
+      }
+    } catch (err) {
+      console.error("Error deleting post:", err)
+    } finally {
+      setDeletingPost(false)
+    }
   }
 
   // Handle opening edit profile modal
@@ -162,8 +247,6 @@ const Profile = () => {
         setUserFullName(editName)
         setUserName(editName)
         setBio(editBio)
-        
-        // Update localStorage
         const storedUser = localStorage.getItem("user")
         if (storedUser) {
           const user = JSON.parse(storedUser)
@@ -172,11 +255,9 @@ const Profile = () => {
         }
         
         setIsEditModalOpen(false)
-        alert("Profile updated successfully!")
       }
     } catch (err) {
       console.error("Error updating profile:", err)
-      alert("Failed to update profile")
     }
   }
 
@@ -206,10 +287,7 @@ const Profile = () => {
 
   // Copy to clipboard helper function
   const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text).then(() => {
-      alert("Profile link copied to clipboard!")
-    }).catch(() => {
-      // Fallback for older browsers
+    navigator.clipboard.writeText(text).catch(() => {
       const textArea = document.createElement("textarea")
       textArea.value = text
       textArea.style.position = "fixed"
@@ -218,9 +296,8 @@ const Profile = () => {
       textArea.select()
       try {
         document.execCommand('copy')
-        alert("Profile link copied to clipboard!")
       } catch (err) {
-        alert("Failed to copy link. Please copy manually: " + text)
+        console.error("Failed to copy link:", err)
       }
       document.body.removeChild(textArea)
     })
@@ -256,14 +333,14 @@ const Profile = () => {
     <div className="min-h-screen" style={{backgroundColor: '#FFFFFF'}}>
       {/* ================= HEADER ================= */}
       <div className="sticky top-0 left-0 right-0 z-50" style={{backgroundColor: '#FFFFFF', borderBottom: '1px solid #DBDBDB'}}>
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-4xl mx-auto   flex items-center justify-between">
+          <div className="flex items-center">
             <img 
-              src="/logo.avif" 
-              alt="CONNECTUNI" 
-              className="h-8 w-auto object-contain"
+              src="/logo.png" 
+              alt="ConnectUNI" 
+              className="h-12 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => navigate("/Home")}
             />
-            <h1 className="instagram-logo" style={{color: '#262626'}}>CONNECTUNI</h1>
           </div>
           
           <div className="flex items-center gap-3">
@@ -302,19 +379,44 @@ const Profile = () => {
           {/* Profile Picture */}
           <div className="flex-shrink-0">
             <div 
-              className="w-24 h-24 md:w-28 md:h-28 rounded-full overflow-hidden cursor-pointer transition-transform hover:scale-105" 
+              className="w-24 h-24 md:w-28 md:h-28 rounded-full overflow-hidden cursor-pointer transition-transform hover:scale-105 relative group" 
               style={{border: '1px solid #DBDBDB'}}
-              onClick={() => dp && setIsDpModalOpen(true)}
+              onClick={handleDpClick}
             >
               {dp ? (
                 <img
                   src={dp}
                   alt="Profile"
-                  className="w-full h-full object-cover"
+                  className={`w-full h-full object-cover ${uploadingDp ? 'opacity-50' : ''}`}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center" style={{backgroundColor: '#FAFAFA'}}>
                   <FaUserCircle size={56} style={{color: '#8E8E8E'}} />
+                </div>
+              )}
+              {/* Loading spinner when uploading */}
+              {uploadingDp && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/30">
+                  <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              )}
+              {/* Overlay hint for adding/changing dp */}
+              {!uploadingDp && (
+                <div 
+                  className="absolute inset-0 flex items-center justify-center rounded-full transition-all"
+                  style={{backgroundColor: 'transparent'}}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.3)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <svg 
+                    className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
                 </div>
               )}
             </div>
@@ -448,13 +550,22 @@ const Profile = () => {
         )}
       </div>
 
-      {/* ================= HIDDEN FILE INPUT ================= */}
+      {/* ================= HIDDEN FILE INPUT FOR POSTS ================= */}
       <input
         type="file"
         ref={fileInputRef}
         className="hidden"
         onChange={handleUpload}
         accept="image/*,video/*"
+      />
+
+      {/* ================= HIDDEN FILE INPUT FOR DP ================= */}
+      <input
+        type="file"
+        ref={dpInputRef}
+        className="hidden"
+        onChange={handleDpUpload}
+        accept="image/*"
       />
 
       {/* ================= PROFILE PICTURE MODAL ================= */}
@@ -465,7 +576,7 @@ const Profile = () => {
           onClick={() => setIsDpModalOpen(false)}
         >
           <div 
-            className="relative flex items-center justify-center"
+            className="relative flex flex-col items-center justify-center gap-6"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close Button */}
@@ -489,6 +600,28 @@ const Profile = () => {
                 className="w-full h-full object-cover"
               />
             </div>
+
+            {/* Change Photo Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                dpInputRef.current?.click()
+              }}
+              className="px-6 py-2.5 rounded-lg font-semibold text-white transition-colors flex items-center gap-2"
+              style={{backgroundColor: '#0095F6'}}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#0085E5'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#0095F6'
+              }}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Change Photo
+            </button>
           </div>
         </div>
       )}
@@ -515,6 +648,20 @@ const Profile = () => {
               style={{backgroundColor: 'rgba(0, 0, 0, 0.5)'}}
             >
               <FaTimes size={24} className="text-white" />
+            </button>
+
+            {/* Delete Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsDeleteConfirmOpen(true)
+              }}
+              className="absolute top-4 right-16 p-2 rounded-full hover:bg-red-600 transition-colors z-10"
+              aria-label="Delete post"
+              title="Delete post"
+              style={{backgroundColor: 'rgba(220, 38, 38, 0.8)'}}
+            >
+              <FaTrash size={20} className="text-white" />
             </button>
 
             {/* Previous Button */}
@@ -666,6 +813,45 @@ const Profile = () => {
                 Save
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= DELETE CONFIRMATION MODAL ================= */}
+      {isDeleteConfirmOpen && (
+        <div 
+          className="fixed inset-0 z-[60] flex items-center justify-center"
+          style={{backgroundColor: 'rgba(0, 0, 0, 0.75)'}}
+          onClick={() => setIsDeleteConfirmOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-lg w-full max-w-sm mx-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-6 text-center border-b" style={{borderColor: '#DBDBDB'}}>
+              <h2 className="text-xl font-semibold mb-2" style={{color: '#262626'}}>Delete Post?</h2>
+              <p className="text-sm" style={{color: '#8E8E8E'}}>
+                Are you sure you want to delete this post? This action cannot be undone.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <button
+              onClick={handleDeletePost}
+              disabled={deletingPost}
+              className="w-full py-3 text-red-500 font-semibold border-b hover:bg-gray-50 transition-colors disabled:opacity-50"
+              style={{borderColor: '#DBDBDB'}}
+            >
+              {deletingPost ? 'Deleting...' : 'Delete'}
+            </button>
+            <button
+              onClick={() => setIsDeleteConfirmOpen(false)}
+              className="w-full py-3 font-semibold hover:bg-gray-50 transition-colors"
+              style={{color: '#262626'}}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

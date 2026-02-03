@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import axios from "axios"
 import { useNavigate } from "react-router-dom"
-import { FaUserCircle, FaRegHeart, FaEllipsisV, FaPlus, FaTimes } from "react-icons/fa"
+import { FaUserCircle, FaRegHeart, FaEllipsisV, FaPlus, FaTimes, FaSignOutAlt } from "react-icons/fa"
 
 function Home() {
   const [feed, setFeed] = useState([])
@@ -13,6 +13,10 @@ function Home() {
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0)
   const [viewerStories, setViewerStories] = useState([]) // Stories to display in viewer (filtered by user)
   const [storyProgress, setStoryProgress] = useState(0)
+  const [isUploadingStory, setIsUploadingStory] = useState(false)
+  const [storyPreview, setStoryPreview] = useState(null)
+  const [storyPreviewType, setStoryPreviewType] = useState(null)
+  const [isUploadingPost, setIsUploadingPost] = useState(false)
   const fileInputRef = useRef(null)
   const storyInputRef = useRef(null)
   const videoRefs = useRef({})
@@ -116,7 +120,6 @@ function Home() {
         const video = entry.target
         const videoId = video.dataset.videoId
 
-        // Don't play feed videos if story viewer is open
         if (isStoryViewerOpen) {
           if (video && !video.paused) {
             video.pause()
@@ -178,6 +181,22 @@ function Home() {
     const file = e.target.files[0]
     if (!file) return
 
+    const previewUrl = URL.createObjectURL(file)
+    const isVideo = file.type.startsWith("video")
+    setIsUploadingPost(true)
+
+    const tempPost = {
+      _id: "temp_" + Date.now(),
+      url: previewUrl,
+      type: isVideo ? "video" : "image",
+      userName: currentUserName,
+      userDp: currentUserDp,
+      createdAt: new Date(),
+      likes: 0,
+      isUploading: true
+    }
+    setFeed(prev => [tempPost, ...prev])
+
     const formData = new FormData()
     formData.append("media", file)
 
@@ -194,10 +213,36 @@ function Home() {
       )
 
       if (res.data.status === 200) {
-        window.location.reload()
+        try {
+          const feedRes = await axios.get("http://localhost:5000/getAllMedia", {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+          const users = feedRes.data.media || []
+          const allPosts = []
+          users.forEach(user => {
+            if (user.media && user.media.length > 0) {
+              user.media.forEach(post => {
+                allPosts.push({
+                  ...post,
+                  userName: user.name,
+                  userDp: user.dp,
+                  createdAt: post.createdAt || new Date(),
+                  likes: (post.likes && post.likes > 0) ? post.likes : Math.floor(Math.random() * 10000) + 100
+                })
+              })
+            }
+          })
+          allPosts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+          setFeed(allPosts)
+        } catch (err) {
+          console.error("Error refreshing feed:", err)
+        }
       }
     } catch (err) {
-      alert("Upload failed")
+      setFeed(prev => prev.filter(p => p._id !== tempPost._id))
+    } finally {
+      setIsUploadingPost(false)
+      URL.revokeObjectURL(previewUrl)
     }
 
     e.target.value = null
@@ -207,6 +252,23 @@ function Home() {
   const handleStoryUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
+
+    const previewUrl = URL.createObjectURL(file)
+    const isVideo = file.type.startsWith("video")
+    setStoryPreview(previewUrl)
+    setStoryPreviewType(isVideo ? "video" : "image")
+    setIsUploadingStory(true)
+
+    const tempStory = {
+      _id: "temp_" + Date.now(),
+      mediaUrl: previewUrl,
+      mediaType: isVideo ? "video" : "image",
+      userName: currentUserName,
+      userDp: currentUserDp,
+      createdAt: new Date(),
+      isUploading: true
+    }
+    setAllStories(prev => [tempStory, ...prev.filter(s => s.userName !== currentUserName)])
 
     const formData = new FormData()
     formData.append("media", file)
@@ -224,7 +286,6 @@ function Home() {
       )
 
       if (res.status === 200) {
-        // Refresh stories
         try {
           const storiesRes = await axios.get("http://localhost:5000/getAllStories", {
             headers: { Authorization: `Bearer ${token}` }
@@ -235,10 +296,14 @@ function Home() {
         } catch (err) {
           console.error("Error refreshing stories:", err)
         }
-        window.location.reload()
       }
     } catch (err) {
-      alert("Story upload failed")
+      setAllStories(prev => prev.filter(s => s._id !== tempStory._id))
+    } finally {
+      setIsUploadingStory(false)
+      setStoryPreview(null)
+      setStoryPreviewType(null)
+      URL.revokeObjectURL(previewUrl)
     }
 
     e.target.value = null
@@ -246,7 +311,6 @@ function Home() {
 
   // Open story viewer - filter to show only clicked user's story
   const openStoryViewer = (clickedStory) => {
-    // Pause all feed videos when story viewer opens
     Object.values(videoRefs.current).forEach((videoRef) => {
       if (videoRef && !videoRef.paused) {
         videoRef.pause()
@@ -279,8 +343,6 @@ function Home() {
       storyVideoRef.current.pause()
     }
     
-    // Resume feed videos when story viewer closes (if they're in viewport)
-    // The intersection observer will handle resuming videos that are visible
   }, [])
 
   // Navigate to next story
@@ -369,10 +431,8 @@ function Home() {
     }
   }, [isStoryViewerOpen, currentStoryIndex, viewerStories, nextStory])
 
-  // Pause all feed videos when story viewer is open
   useEffect(() => {
     if (isStoryViewerOpen) {
-      // Pause all feed videos
       Object.values(videoRefs.current).forEach((videoRef) => {
         if (videoRef && !videoRef.paused) {
           videoRef.pause()
@@ -399,18 +459,25 @@ function Home() {
     return () => window.removeEventListener("keydown", handleKeyPress)
   }, [isStoryViewerOpen, nextStory, prevStory, closeStoryViewer])
 
+  // Handle logout
+  const handleLogout = () => {
+    localStorage.removeItem("token")
+    localStorage.removeItem("user")
+    navigate("/")
+  }
+
   return (
     <div className="min-h-screen" style={{backgroundColor: '#FFFFFF'}}>
       {/* ================= HEADER ================= */}
       <div className="sticky top-0 left-0 right-0 z-50" style={{backgroundColor: '#FFFFFF', borderBottom: '1px solid #DBDBDB'}}>
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto  flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img 
-              src="/logo.avif" 
+              src="/logo.png" 
               alt="CONNECTUNI" 
-              className="h-8 w-auto object-contain"
+              className="size-20 w-auto object-contain"
             />
-            <h1 className="instagram-logo" style={{color: '#262626'}}>CONNECTUNI</h1>
+            
           </div>
           
           <div className="flex items-center gap-3">
@@ -439,14 +506,28 @@ function Home() {
               aria-label="Profile"
             >
               {currentUserDp ? (
-                <img
-                  src={currentUserDp}
-                  alt="Profile"
-                  className="w-8 h-8 rounded-full object-cover"
-                />
+                <div className="w-8 h-8 rounded-full overflow-hidden">
+                  <img
+                    src={currentUserDp}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
               ) : (
                 <FaUserCircle size={28} style={{color: '#262626'}} />
               )}
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-full transition-colors"
+              style={{color: '#262626'}}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FAFAFA'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              aria-label="Logout"
+              title="Logout"
+            >
+              <FaSignOutAlt size={20} />
             </button>
           </div>
         </div>
@@ -464,37 +545,47 @@ function Home() {
                 // User has a story - show it like other stories with plus icon
                 return (
                   <div 
-                    className="flex flex-col items-center min-w-[70px] cursor-pointer relative"
-                    onClick={() => openStoryViewer(currentUserStory)}
+                    className="flex flex-col items-center min-w-[70px] cursor-pointer"
+                    onClick={() => !currentUserStory.isUploading && openStoryViewer(currentUserStory)}
                   >
-                    <div className="w-16 h-16 rounded-full p-[2px]" style={{background: 'linear-gradient(to right, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)'}}>
-                      <div className="w-full h-full rounded-full bg-white p-[2px]">
-                        {currentUserDp ? (
-                          <img
-                            src={currentUserDp}
-                            alt={currentUserName}
-                            className="w-full h-full rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full rounded-full flex items-center justify-center" style={{backgroundColor: '#FAFAFA'}}>
-                            <FaUserCircle size={28} style={{color: '#8E8E8E'}} />
+                    <div className="relative">
+                      <div className="w-16 h-16 rounded-full p-[2px]" style={{background: 'linear-gradient(to right, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)'}}>
+                        <div className="w-full h-full rounded-full bg-white p-[2px]">
+                          {currentUserDp ? (
+                            <img
+                              src={currentUserDp}
+                              alt={currentUserName}
+                              className="w-full h-full rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full rounded-full flex items-center justify-center" style={{backgroundColor: '#FAFAFA'}}>
+                              <FaUserCircle size={28} style={{color: '#8E8E8E'}} />
+                            </div>
+                          )}
+                        </div>
+                        {/* Loading overlay */}
+                        {currentUserStory.isUploading && (
+                          <div className="absolute inset-0 rounded-full flex items-center justify-center" style={{backgroundColor: 'rgba(0,0,0,0.5)'}}>
+                            <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                           </div>
                         )}
                       </div>
-                    </div>
-                    {/* Plus icon to change story */}
-                    <div 
-                      className="absolute -bottom-0.5 -right-0.5 rounded-full p-1 border-2 cursor-pointer z-10"
-                      style={{backgroundColor: '#0095F6', borderColor: '#FFFFFF'}}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        storyInputRef.current?.click()
-                      }}
-                    >
-                      <FaPlus size={10} className="text-white" />
+                      {/* Plus icon to change story */}
+                      {!isUploadingStory && (
+                        <div 
+                          className="absolute bottom-0 right-0 rounded-full p-1 border-2 cursor-pointer z-10"
+                          style={{backgroundColor: '#0095F6', borderColor: '#FFFFFF'}}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            storyInputRef.current?.click()
+                          }}
+                        >
+                          <FaPlus size={10} className="text-white" />
+                        </div>
+                      )}
                     </div>
                     <span className="text-xs mt-1.5 font-normal truncate max-w-[70px] text-center" style={{color: '#262626'}}>
-                      {currentUserName?.toUpperCase() || 'YOUR STORY'}
+                      {isUploadingStory ? 'UPLOADING...' : (currentUserName?.toUpperCase() || 'YOUR STORY')}
                     </span>
                   </div>
                 )
@@ -503,25 +594,37 @@ function Home() {
                 return (
                   <div 
                     className="flex flex-col items-center min-w-[70px] cursor-pointer"
-                    onClick={() => storyInputRef.current?.click()}
+                    onClick={() => !isUploadingStory && storyInputRef.current?.click()}
                   >
-                    <div className="relative w-16 h-16 rounded-full p-[2px]" style={{border: '2px solid #DBDBDB'}}>
-                      {currentUserDp ? (
-                        <img
-                          src={currentUserDp}
-                          alt="Your story"
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full rounded-full flex items-center justify-center" style={{backgroundColor: '#FAFAFA'}}>
-                          <FaUserCircle size={28} style={{color: '#8E8E8E'}} />
+                    <div className="relative">
+                      <div className="w-16 h-16 rounded-full p-[2px]" style={{border: '2px solid #DBDBDB'}}>
+                        {currentUserDp ? (
+                          <img
+                            src={currentUserDp}
+                            alt="Your story"
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full rounded-full flex items-center justify-center" style={{backgroundColor: '#FAFAFA'}}>
+                            <FaUserCircle size={28} style={{color: '#8E8E8E'}} />
+                          </div>
+                        )}
+                        {/* Loading overlay */}
+                        {isUploadingStory && (
+                          <div className="absolute inset-0 rounded-full flex items-center justify-center" style={{backgroundColor: 'rgba(0,0,0,0.5)'}}>
+                            <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          </div>
+                        )}
+                      </div>
+                      {!isUploadingStory && (
+                        <div className="absolute bottom-0 right-0 rounded-full p-1 border-2" style={{backgroundColor: '#0095F6', borderColor: '#FFFFFF'}}>
+                          <FaPlus size={10} className="text-white" />
                         </div>
                       )}
-                      <div className="absolute -bottom-0.5 -right-0.5 rounded-full p-1 border-2" style={{backgroundColor: '#0095F6', borderColor: '#FFFFFF'}}>
-                        <FaPlus size={10} className="text-white" />
-                      </div>
                     </div>
-                    <span className="text-xs mt-1.5 font-normal truncate max-w-[70px] text-center" style={{color: '#262626'}}>Your story</span>
+                    <span className="text-xs mt-1.5 font-normal truncate max-w-[70px] text-center" style={{color: '#262626'}}>
+                      {isUploadingStory ? 'UPLOADING...' : 'Your story'}
+                    </span>
                   </div>
                 )
               }
@@ -576,11 +679,13 @@ function Home() {
               <div className="flex items-center justify-between px-4 py-3" style={{borderBottom: '1px solid #DBDBDB'}}>
                 <div className="flex items-center gap-3">
                   {post.userDp ? (
-                    <img
-                      src={post.userDp}
-                      alt={post.userName}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
+                    <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                      <img
+                        src={post.userDp}
+                        alt={post.userName}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
                   ) : (
                     <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{backgroundColor: '#FAFAFA'}}>
                       <FaUserCircle size={24} style={{color: '#8E8E8E'}} />
@@ -600,23 +705,30 @@ function Home() {
 
               {/* Media Content */}
               {post.type === "image" && (
-                <div className="w-full max-h-[600px] overflow-hidden bg-black flex items-center justify-center">
+                <div className="w-full max-h-[400px] overflow-hidden bg-black flex items-center justify-center relative">
                   <img
                     src={post.url}
                     alt="Post"
-                    className="w-full h-auto max-h-[600px] object-contain"
+                    className="w-full h-auto max-h-[400px] object-contain"
                   />
+                  {post.isUploading && (
+                    <div className="absolute inset-0 flex items-center justify-center" style={{backgroundColor: 'rgba(0,0,0,0.5)'}}>
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-10 h-10 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-white text-sm font-medium">Uploading...</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
               {post.type === "video" && (
-                <div className="w-full max-h-[600px] overflow-hidden bg-black">
+                <div className="w-full max-h-[400px] overflow-hidden bg-black relative">
                   <video
                     ref={(el) => {
                       if (el) {
                         videoRefs.current[`video-${index}`] = el
                         el.dataset.videoId = `video-${index}`
-                        // Unmute when video starts playing to enable sound
                         const handlePlay = () => {
                           if (el.muted) {
                             setTimeout(() => {
@@ -630,8 +742,16 @@ function Home() {
                     src={post.url}
                     controls
                     playsInline
-                    className="w-full h-auto max-h-[600px] object-contain"
+                    className="w-full h-auto max-h-[400px] object-contain"
                   />
+                  {post.isUploading && (
+                    <div className="absolute inset-0 flex items-center justify-center" style={{backgroundColor: 'rgba(0,0,0,0.5)'}}>
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-10 h-10 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-white text-sm font-medium">Uploading...</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -738,11 +858,13 @@ function Home() {
             <div className="absolute top-12 left-0 right-0 z-10 px-4 py-3 flex items-center justify-between pointer-events-none">
               <div className="flex items-center gap-3 pointer-events-auto">
                 {viewerStories[currentStoryIndex].userDp ? (
-                  <img
-                    src={viewerStories[currentStoryIndex].userDp}
-                    alt={viewerStories[currentStoryIndex].userName}
-                    className="w-8 h-8 rounded-full object-cover border-2 border-white"
-                  />
+                  <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-white flex-shrink-0">
+                    <img
+                      src={viewerStories[currentStoryIndex].userDp}
+                      alt={viewerStories[currentStoryIndex].userName}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                 ) : (
                   <div className="w-8 h-8 rounded-full flex items-center justify-center border-2 border-white" style={{backgroundColor: '#FAFAFA'}}>
                     <FaUserCircle size={20} style={{color: '#8E8E8E'}} />

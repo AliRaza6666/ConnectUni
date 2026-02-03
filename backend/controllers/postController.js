@@ -66,10 +66,42 @@ const getMyPosts = async (req, res) => {
   }
 };
 
+// Delete a post by its ID
+const deletePost = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const postId = req.params.postId;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ status: 404, msg: "User not found" });
+    }
+
+    // Find the post index
+    const postIndex = user.media.findIndex(post => post._id.toString() === postId);
+    
+    if (postIndex === -1) {
+      return res.status(404).json({ status: 404, msg: "Post not found" });
+    }
+
+    // Remove the post from the media array
+    user.media.splice(postIndex, 1);
+    await user.save();
+
+    res.status(200).json({ 
+      status: 200, 
+      msg: "Post deleted successfully" 
+    });
+  } catch (err) {
+    res.status(500).json({ status: 500, msg: err.message });
+  }
+};
+
 module.exports = {
   addPost,
   getAllMedia,
-  getMyPosts
+  getMyPosts,
+  deletePost
 };
 
 
