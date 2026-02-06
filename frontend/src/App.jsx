@@ -5,7 +5,7 @@ import { BrowserRouter,Routes,Route} from 'react-router-dom'
 import Home from './pages/Home'
 import Auth from "./pages/Auth"
 import Profile from "./pages/Profile"
-import Messages from './pages/messages'
+import Messages from './pages/Messages'
 function App() {
      return(
      <BrowserRouter>
