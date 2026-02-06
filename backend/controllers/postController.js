@@ -20,16 +20,24 @@ const addPost = async (req, res) => {
       });
       return;
     }
-    user.media.push({
+    
+    // Create the new post object
+    const newPost = {
       url: req.file.path, // Cloudinary URL
       type: req.file.mimetype.startsWith("video") ? "video" : "image"
-    });
-
+    };
+    
+    user.media.push(newPost);
     await user.save();
+    
+    // Get the ID of the newly added post (last item in the array)
+    const addedPost = user.media[user.media.length - 1];
+    
     res.send({
       status: 200,
       msg: "Post Uploaded Successfully",
-      url: req.file.path
+      url: req.file.path,
+      postId: addedPost._id.toString()
     });
   } catch (err) {
     res.send({
