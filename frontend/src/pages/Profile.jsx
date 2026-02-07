@@ -2,6 +2,7 @@ import axios from 'axios'
 import React, { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FaUserCircle, FaTimes, FaTrash } from 'react-icons/fa'
+import { API_URL } from '../config'
 
 // Function to format numbers (e.g., 2400 -> 2.4K)
 const formatNumber = (num) => {
@@ -60,7 +61,7 @@ const Profile = () => {
 
         // Fetch profile data
         try {
-          const profileRes = await axios.get("http://localhost:5000/getProfile", {
+          const profileRes = await axios.get(`${API_URL}/getProfile`, {
             headers: { Authorization: `Bearer ${token}` }
           })
           if (profileRes.data.profile) {
@@ -74,7 +75,7 @@ const Profile = () => {
           console.error("Error fetching profile:", err)
           // Fallback to DP endpoint if profile endpoint fails
           try {
-            const dpRes = await axios.get("http://localhost:5000/getDp", {
+            const dpRes = await axios.get(`${API_URL}/getDp`, {
               headers: { Authorization: `Bearer ${token}` }
             })
             setDp(dpRes.data.dp || "")
@@ -85,7 +86,7 @@ const Profile = () => {
 
         // Fetch user posts
         try {
-          const postsRes = await axios.get("http://localhost:5000/getMyPosts", {
+          const postsRes = await axios.get(`${API_URL}/getMyPosts`, {
             headers: { Authorization: `Bearer ${token}` }
           })
           if (postsRes.data.posts) {
@@ -127,7 +128,7 @@ const Profile = () => {
     try {
       const token = localStorage.getItem("token")
       const res = await axios.post(
-        "http://localhost:5000/addPost",
+        `${API_URL}/addPost`,
         formData,
         {
           headers: {
@@ -178,7 +179,7 @@ const Profile = () => {
     try {
       const token = localStorage.getItem("token")
       const res = await axios.post(
-        "http://localhost:5000/uploadDp",
+        `${API_URL}/uploadDp`,
         formData,
         {
           headers: {
@@ -221,7 +222,7 @@ const Profile = () => {
       const postId = posts[selectedPostIndex]._id
       
       const res = await axios.delete(
-        `http://localhost:5000/deletePost/${postId}`,
+        `${API_URL}/deletePost/${postId}`,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -254,7 +255,7 @@ const Profile = () => {
     try {
       const token = localStorage.getItem("token")
       const res = await axios.put(
-        "http://localhost:5000/updateProfile",
+        `${API_URL}/updateProfile`,
         {
           name: editName,
           bio: editBio

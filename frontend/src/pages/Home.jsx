@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import axios from "axios"
 import { useNavigate } from "react-router-dom"
 import { FaUserCircle, FaRegHeart, FaEllipsisV, FaPlus, FaTimes, FaSignOutAlt } from "react-icons/fa"
+import { API_URL } from "../config"
 
 function Home() {
   const [feed, setFeed] = useState([])
@@ -43,7 +44,7 @@ function Home() {
 
         // Fetch current user's DP
         try {
-          const dpRes = await axios.get("http://localhost:5000/getDp", {
+          const dpRes = await axios.get(`${API_URL}/getDp`, {
             headers: { Authorization: `Bearer ${token}` }
           })
           setCurrentUserDp(dpRes.data.dp || "")
@@ -53,7 +54,7 @@ function Home() {
 
         // Fetch all media (posts and users)
         const res = await axios.get(
-          "http://localhost:5000/getAllMedia",
+          `${API_URL}/getAllMedia`,
           {
             headers: {
               Authorization: `Bearer ${token}`
@@ -69,7 +70,7 @@ function Home() {
 
         // Fetch all stories with media
         try {
-          const storiesRes = await axios.get("http://localhost:5000/getAllStories", {
+          const storiesRes = await axios.get(`${API_URL}/getAllStories`, {
             headers: { Authorization: `Bearer ${token}` }
           })
           if (storiesRes.data.stories) {
@@ -264,7 +265,7 @@ function Home() {
     try {
       const token = localStorage.getItem("token")
       const res = await axios.post(
-        "http://localhost:5000/addPost",
+        `${API_URL}/addPost`,
         formData,
         {
           headers: {
@@ -338,7 +339,7 @@ function Home() {
     try {
       const token = localStorage.getItem("token")
       const res = await axios.post(
-        "http://localhost:5000/addStory",
+        `${API_URL}/addStory`,
         formData,
         {
           headers: {

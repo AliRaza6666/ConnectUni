@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import react from "../assets/react.svg"
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios';
+import { API_URL } from '../config';
 
 
 const Messages = () => {
@@ -38,7 +39,7 @@ const Messages = () => {
 
   const handleSearch = async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/searchUser?name=${search}`)
+      const response = await axios.get(`${API_URL}/searchUser?name=${search}`)
       setSearchedUsers(response.data) 
       console.log(response.data) 
     } catch (err) {
@@ -62,7 +63,7 @@ const Messages = () => {
      try{
           const token=localStorage.getItem("token")
           const res = await axios.delete(
-    `http://localhost:5000/deleteMessage`,
+    `${API_URL}/deleteMessage`,
     {
      data:data,
      headers: {
@@ -82,7 +83,7 @@ const Messages = () => {
     try{
         
         const token=localStorage.getItem("token")
-        const res=await axios.patch(`http://localhost:5000/updateMessage/${msgId}`,{
+        const res=await axios.patch(`${API_URL}/updateMessage/${msgId}`,{
           text:editedMsg},
           {headers:{
             authorization: `Bearer ${token}`
@@ -126,7 +127,7 @@ const Messages = () => {
     const token=localStorage.getItem("token")
     try {
   const res = await axios.get(
-    `http://localhost:5000/getMessages/${roomId}`,
+    `${API_URL}/getMessages/${roomId}`,
     {
       headers: {
         authorization: `Bearer ${token}`,
@@ -156,7 +157,7 @@ const Messages = () => {
     //wo sare response agye lekin unke listners ready nhi the , r jb we ready houn ge tb unko null
     //vlaues hi milien gi 
     //isliye hum isko use efeect mei  rkhte hain ta k component render ho tb hi sb kuch)
-     const socket = io("http://localhost:5000",{    //sending token also bcz we want to get user id 
+     const socket = io(API_URL,{    //sending token also bcz we want to get user id 
                                                //so that we can get to know which user is online
   auth:{
     token:localStorage.getItem("token")
@@ -204,7 +205,7 @@ const Messages = () => {
    let fetchUser=async()=>{
          const token=localStorage.getItem("token")
          const user=JSON.parse(localStorage.getItem("user"))
-         const res=await axios.get("http://localhost:5000/getAllUsers",{
+         const res=await axios.get(`${API_URL}/getAllUsers`,{
           headers:{
             authorization:`Bearer ${token}`
           }

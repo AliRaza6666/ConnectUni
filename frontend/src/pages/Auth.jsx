@@ -2,6 +2,7 @@
 import { useState } from "react";
 import axios from "axios";
 import { Navigate, useNavigate } from "react-router-dom";
+import { API_URL } from "../config";
 
 const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -20,13 +21,13 @@ const AuthPage = () => {
 
     try {
       if (isLogin) {
-        const res = await axios.post("http://localhost:5000/logIn", { email, password });
+        const res = await axios.post(`${API_URL}/logIn`, { email, password });
         localStorage.setItem("token", res.data.token);
         localStorage.setItem("user", JSON.stringify(res.data.user));
         // alert("Login successful!"); // Replace with redirect later
         navigate("/Home")
       } else {
-        const res = await axios.post("http://localhost:5000/signup", { name, email, password });
+        const res = await axios.post(`${API_URL}/signup`, { name, email, password });
         if (res.data.status === 200) {
           // alert("Signup successful! Please login.");
           setIsLogin(true);
